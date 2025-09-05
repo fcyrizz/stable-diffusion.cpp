@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: "Create new release"
+        description: "Create new release for Ubuntu 22.04"
         required: true
         type: boolean
   push:
