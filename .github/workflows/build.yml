@@ -4,39 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: "Create new release for Ubuntu 22.04"
+        description: "Create new release for Ubuntu 22.04 with CUDA"
         required: true
         type: boolean
-  push:
-    branches:
-      - master
-      - ci
-    paths:
-      [
-        ".github/workflows/**",
-        "**/CMakeLists.txt",
-        "**/Makefile",
-        "**/*.h",
-        "**/*.hpp",
-        "**/*.c",
-        "**/*.cpp",
-        "**/*.cu",
-      ]
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      [
-        "**/CMakeLists.txt",
-        "**/Makefile",
-        "**/*.h",
-        "**/*.hpp",
-        "**/*.c",
-        "**/*.cpp",
-        "**/*.cu",
-      ]
-
-env:
-  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
 
 jobs:
   ubuntu-22_04-cmake:
@@ -48,88 +18,34 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Dependencies
+      - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential zip
+          sudo apt-get install -y build-essential zip wget gnupg
 
-      - name: Build
+      - name: Install CUDA 12.2
+        run: |
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-archive-keyring.gpg
+          sudo mv cuda-archive-keyring.gpg /usr/share/keyrings/
+          sudo sh -c 'echo "deb [signed-by=/usr/share/keyrings/cuda-archive-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/ /" > /etc/apt/sources.list.d/cuda.list'
+          sudo apt-get update
+          sudo apt-get -y install cuda-toolkit-12-2
+
+      - name: Build with CUDA
         run: |
           mkdir build
           cd build
           cmake .. -DSD_CUDA=ON -DSD_BUILD_SHARED_LIBS=ON
-          cmake --build . --config Release
-
-      - name: Get commit hash
-        id: commit
-        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
-        uses: pr-mpt/actions-commit-hash@v2
-
-      - name: Fetch system info
-        id: system-info
-        run: |
-          echo "CPU_ARCH=$(uname -m)" >> "$GITHUB_OUTPUT"
-          echo "OS_NAME=$(lsb_release -s -i)" >> "$GITHUB_OUTPUT"
-          echo "OS_VERSION=$(lsb_release -s -r)" >> "$GITHUB_OUTPUT"
-          echo "OS_TYPE=$(uname -s)" >> "$GITHUB_OUTPUT"
+          cmake --build . --config Release -j$(nproc)
 
       - name: Pack artifacts
-        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         run: |
           cp ggml/LICENSE ./build/bin/ggml.txt
           cp LICENSE ./build/bin/stable-diffusion.cpp.txt
-          zip -j sd-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-${{ steps.system-info.outputs.OS_TYPE }}-${{ steps.system-info.outputs.OS_NAME }}-${{ steps.system-info.outputs.OS_VERSION }}-${{ steps.system-info.outputs.CPU_ARCH }}.zip ./build/bin/*
+          zip -j sd-ubuntu22.04-cuda-bin.zip ./build/bin/*
 
       - name: Upload artifacts
-        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: sd-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-${{ steps.system-info.outputs.OS_TYPE }}-${{ steps.system-info.outputs.OS_NAME }}-${{ steps.system-info.outputs.OS_VERSION }}-${{ steps.system-info.outputs.CPU_ARCH }}.zip
-          path: |
-            sd-${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}-bin-${{ steps.system-info.outputs.OS_TYPE }}-${{ steps.system-info.outputs.OS_NAME }}-${{ steps.system-info.outputs.OS_VERSION }}-${{ steps.system-info.outputs.CPU_ARCH }}.zip
-
-  release:
-    if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
-    runs-on: ubuntu-22.04
-    needs: [ubuntu-22_04-cmake]
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifact
-          pattern: sd-*
-          merge-multiple: true
-
-      - name: Get commit hash
-        id: commit
-        uses: pr-mpt/actions-commit-hash@v2
-
-      - name: Create release
-        id: create_release
-        uses: anzz1/action-create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ env.BRANCH_NAME }}-${{ steps.commit.outputs.short }}
-
-      - name: Upload release
-        uses: actions/github-script@v3
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const path = require('path');
-            const fs = require('fs');
-            const release_id = '${{ steps.create_release.outputs.id }}';
-            for (let file of await fs.readdirSync('./artifact')) {
-              if (path.extname(file) === '.zip') {
-                console.log('uploadReleaseAsset', file);
-                await github.repos.uploadReleaseAsset({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  release_id: release_id,
-                  name: file,
-                  data: await fs.readFileSync(`./artifact/${file}`)
-                });
-              }
-            }
+          name: sd-ubuntu22.04-cuda-bin.zip
+          path: sd-ubuntu22.04-cuda-bin.zip
