@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       create_release:
-        description: "Create new release for Ubuntu 22.04 with CUDA"
+        description: "Create new release for Ubuntu 22.04 with CUDA by fcyrizz"
         required: true
         type: boolean
 
