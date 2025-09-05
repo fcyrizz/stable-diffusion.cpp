@@ -57,7 +57,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake .. -DGGML_AVX2=ON -DSD_BUILD_SHARED_LIBS=ON
+          cmake .. -DSD_CUDA=ON -DSD_BUILD_SHARED_LIBS=ON
           cmake --build . --config Release
 
       - name: Get commit hash
