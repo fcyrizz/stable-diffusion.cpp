@@ -52,7 +52,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential zip cmake git
-
+          sudo apt-get install -y g++-10 gcc-10
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-10 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-10 100
+          gcc --version
+          g++ --version
+          
       - name: Install CUDA
         run: |
           sudo apt-get install -y nvidia-cuda-toolkit
@@ -64,9 +69,11 @@ jobs:
           cmake .. -DSD_CUDA=ON -DSD_BUILD_SHARED_LIBS=ON \
            -DCMAKE_CUDA_STANDARD=17 \
            -DCMAKE_CUDA_FLAGS="--std=c++17" \
-           -DCMAKE_CUDA_ARCHITECTURES="61;70;75;86"
+           -DCMAKE_CUDA_ARCHITECTURES="61;70;75;86" \
+           -DCMAKE_C_COMPILER=/usr/bin/gcc-10 \
+           -DCMAKE_CXX_COMPILER=/usr/bin/g++-10
           cmake --build . --config Release --target sd -j$(nproc)
-  
+          
       - name: Get commit hash
         id: commit
         if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/master' ) || github.event.inputs.create_release == 'true' }}
