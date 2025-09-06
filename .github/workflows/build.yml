@@ -68,7 +68,7 @@ jobs:
           cd build
           cmake .. -DSD_CUDA=ON -DSD_BUILD_SHARED_LIBS=ON \
            -DCMAKE_CUDA_STANDARD=17 \
-           -DCMAKE_CUDA_FLAGS="--std=c++17" \
+           -DCMAKE_CUDA_FLAGS="--std=c++17 -ccbin=/usr/bin/g++-10" \
            -DCMAKE_CUDA_ARCHITECTURES="61;70;75;86" \
            -DCMAKE_C_COMPILER=/usr/bin/gcc-10 \
            -DCMAKE_CXX_COMPILER=/usr/bin/g++-10
